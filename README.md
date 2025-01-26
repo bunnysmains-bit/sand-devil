@@ -1,6 +1,6 @@
 ## Sand Devil
 
-![[logo.png]]
+![assets/logo.png]
 
 #### Overview
 
@@ -8,7 +8,7 @@ Automates the process of running a whois query against a known IP, identifying t
 
 ***Note: it supports IPv6, but you'll need to download a lot more RAM to use it due to the exponentially larger address space it has to generate individual IPs for. See screenshot below***
 
-![[assets/more-ram-needed-for-ipv6.png]]
+![assets/more-ram-needed-for-ipv6.png]
 
 #### Usage
 
