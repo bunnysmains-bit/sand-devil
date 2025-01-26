@@ -1,6 +1,6 @@
 ## Sand Devil
 
-![Logo containing a sea demon](assets/logo.png)
+<p align="center"><a href="https://github.com/redskal/sand-devil"><img alt="Logo containing a sea demon" src="assets/logo.png" width="50%" /></a></p>
 
 #### Overview
 
