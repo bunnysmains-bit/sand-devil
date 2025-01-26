@@ -8,12 +8,12 @@ Automates the process of running a whois query against a known IP, identifying t
 
 ***Note: it supports IPv6, but you'll need to download a lot more RAM to use it due to the exponentially larger address space it has to generate individual IPs for. See screenshot below***
 
-![More RAM, vicar?](assets/more-ram-needed-for-ipv6.png)
+<p align="center"><img alt="More RAM, vicar?" src="assets/more-ram-needed-for-ipv6.png" /></p>
 
 #### Usage
 
 ```bash
-Usage of lrr:
+Usage of sand-devil:
   -keywords string
         Comma-separated list of keywords to search for
   -resolver string
