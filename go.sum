@@ -1,0 +1,6 @@
+github.com/likexian/gokit v0.25.15 h1:QjospM1eXhdMMHwZRpMKKAHY/Wig9wgcREmLtf9NslY=
+github.com/likexian/gokit v0.25.15/go.mod h1:S2QisdsxLEHWeD/XI0QMVeggp+jbxYqUxMvSBil7MRg=
+github.com/likexian/whois v1.15.5 h1:gpPxyCTJtLtJDmakHCo//0ZjK/ocI01GCAd/WBJ2oH8=
+github.com/likexian/whois v1.15.5/go.mod h1:4b6o1QTCfjwrB5I3KeNQnn79QtuPUTsewsE+ys94I78=
+golang.org/x/net v0.28.0 h1:a9JDOJc5GMUJ0+UDqmLT86WiEy7iWyIhz8gz8E4e5hE=
+golang.org/x/net v0.28.0/go.mod h1:yqtgsTWOOnlGLG9GFRrK3++bGOUEkNBoHZc8MEDWPNg=
