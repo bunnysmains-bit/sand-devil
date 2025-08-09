@@ -48,8 +48,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"regexp"
 	"slices"
@@ -79,10 +81,12 @@ func banner() {
 
 func main() {
 	banner()
-	ipAddress := flag.String("target", "", "Target IP address to query for whois information.")
+	ipAddress := flag.String("target", "", "Target IP address or domain to query for whois information.")
 	keywords := flag.String("keywords", "", "Comma-separated list of keywords to search for")
 	dnsServer := flag.String("resolver", "1.1.1.1", "DNS server to use for lookups")
 	threads := flag.Int("threads", 100, "Number of threads to create")
+	outputFile := flag.String("output", "", "Output file to write results (optional)")
+	urlFlag := flag.String("url", "", "URL to scrape for keywords (optional)")
 	flag.Parse()
 
 	r.PreferGo = true
@@ -93,78 +97,127 @@ func main() {
 		return d.DialContext(ctx, network, fmt.Sprintf("%s:53", *dnsServer))
 	}
 
-	if *ipAddress == "" || *keywords == "" {
-		flag.Usage()
-		os.Exit(1)
-	}
+       if *urlFlag != "" && *keywords != "" {
+	       // Scrape the URL for keywords
+	       resp, err := http.Get(*urlFlag)
+	       if err != nil {
+		       log.Fatalf("Failed to fetch URL: %v", err)
+	       }
+	       defer resp.Body.Close()
+	       body, err := io.ReadAll(resp.Body)
+	       if err != nil {
+		       log.Fatalf("Failed to read URL body: %v", err)
+	       }
+	       found := false
+	       for _, word := range strings.Split(*keywords, ",") {
+		       if strings.Contains(string(body), word) {
+			       fmt.Printf("Keyword '%s' found in %s\n", word, *urlFlag)
+			       found = true
+		       }
+	       }
+	       if !found {
+		       fmt.Printf("No keywords found in %s\n", *urlFlag)
+	       }
+	       return
+       } else if *ipAddress == "" || *keywords == "" {
+	       flag.Usage()
+	       os.Exit(1)
+       }
 
-	keywordsParsed := strings.Split(*keywords, ",")
+       // ...existing code for -target and -keywords...
+       target := *ipAddress
+       // If the target is not an IP, try to resolve it
+       if net.ParseIP(target) == nil {
+	       ips, err := net.LookupIP(target)
+	       if err != nil || len(ips) == 0 {
+		       log.Fatalf("Could not resolve domain %s: %v", target, err)
+	       }
+	       target = ips[0].String()
+	       log.Printf("Resolved %s to %s", *ipAddress, target)
+       }
 
-	// get whois information for IP
-	whoisResult, err := whois.Whois(*ipAddress)
-	if err != nil {
-		log.Fatal(err)
-	}
-	//fmt.Println(whoisResult)
+       keywordsParsed := strings.Split(*keywords, ",")
 
-	var targetSubnets []string
+       // get whois information for IP
+       whoisResult, err := whois.Whois(target)
+       if err != nil {
+	       log.Fatal(err)
+       }
+       //fmt.Println(whoisResult)
 
-	// this is an ugly work around because I couldn't get regexes working
-	// to extract IPv6 CIDRs.
-	tempCidrs, err := getCIDRsFromString(whoisResult)
-	if err != nil {
-		log.Fatal(err)
-	}
-	// this could be a one-liner, but we want to de-duplicate
-	for _, subnet := range tempCidrs {
-		if !slices.Contains(targetSubnets, subnet) {
-			targetSubnets = append(targetSubnets, subnet)
-		}
-	}
+       var targetSubnets []string
 
-	targetAS, _ := extractStringsWithRegex(whoisResult, `(AS\d+)`)
-	log.Println("Route CIDR found:      ", targetSubnets)
-	if targetAS != nil {
-		log.Println("AS number found:       ", targetAS[0])
-	}
+       // this is an ugly work around because I couldn't get regexes working
+       // to extract IPv6 CIDRs.
+       tempCidrs, err := getCIDRsFromString(whoisResult)
+       if err != nil {
+	       log.Fatal(err)
+       }
+       // this could be a one-liner, but we want to de-duplicate
+       for _, subnet := range tempCidrs {
+	       if !slices.Contains(targetSubnets, subnet) {
+		       targetSubnets = append(targetSubnets, subnet)
+	       }
+       }
 
-	var ips []string
-	for _, subnet := range targetSubnets {
-		ipAddr, err := getIPsFromCIDR(subnet)
-		if err != nil {
-			log.Fatal(err)
-		}
-		ips = append(ips, ipAddr...)
-	}
+       targetAS, _ := extractStringsWithRegex(whoisResult, `(AS\d+)`)
+       log.Println("Route CIDR found:      ", targetSubnets)
+       if targetAS != nil {
+	       log.Println("AS number found:       ", targetAS[0])
+       }
 
-	log.Println("Number of IPs to scan: ", len(ips))
+       var ips []string
+       for _, subnet := range targetSubnets {
+	       ipAddr, err := getIPsFromCIDR(subnet)
+	       if err != nil {
+		       log.Fatal(err)
+	       }
+	       ips = append(ips, ipAddr...)
+       }
 
-	ipChan := make(chan string)
-	gather := make(chan result)
-	tracker := make(chan empty)
+       log.Println("Number of IPs to scan: ", len(ips))
 
-	for i := 0; i < *threads; i++ {
-		go worker(tracker, ipChan, gather, keywordsParsed)
-	}
+       ipChan := make(chan string)
+       gather := make(chan result)
+       tracker := make(chan empty)
 
-	go func() {
-		for r := range gather {
-			fmt.Printf("%-15s => %s\n", r.ip, r.domain)
-		}
-		var e empty
-		tracker <- e
-	}()
+       for i := 0; i < *threads; i++ {
+	       go worker(tracker, ipChan, gather, keywordsParsed)
+       }
 
-	for _, v := range ips {
-		ipChan <- v
-	}
+       var output *os.File
+       var errOutput error
+       if *outputFile != "" {
+	       output, errOutput = os.Create(*outputFile)
+	       if errOutput != nil {
+		       log.Fatalf("Failed to open output file: %v", errOutput)
+	       }
+	       defer output.Close()
+       }
 
-	close(ipChan)
-	for i := 0; i < *threads; i++ {
-		<-tracker
-	}
-	close(gather)
-	<-tracker
+       go func() {
+	       for r := range gather {
+		       line := fmt.Sprintf("%-15s => %s\n", r.ip, r.domain)
+		       if output != nil {
+			       output.WriteString(line)
+		       } else {
+			       fmt.Print(line)
+		       }
+	       }
+	       var e empty
+	       tracker <- e
+       }()
+
+       for _, v := range ips {
+	       ipChan <- v
+       }
+
+       close(ipChan)
+       for i := 0; i < *threads; i++ {
+	       <-tracker
+       }
+       close(gather)
+       <-tracker
 }
 
 func worker(tracker chan empty, ips chan string, gather chan result, keywords []string) {
