@@ -154,6 +154,7 @@ func main() {
 		       log.Printf("Whois failed for %s: %v", ip, err)
 		       continue
 	       }
+	       // Extract subnets (CIDRs) from whois result
 	       tempCidrs, err := getCIDRsFromString(whoisResult)
 	       if err == nil {
 		       for _, subnet := range tempCidrs {
@@ -162,6 +163,7 @@ func main() {
 			       }
 		       }
 	       }
+	       // Extract ASN(s) from whois result
 	       targetAS, _ := extractStringsWithRegex(whoisResult, `(AS\\d+)`)
 	       if targetAS != nil {
 		       for _, asn := range targetAS {
