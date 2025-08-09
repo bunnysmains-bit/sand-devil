@@ -124,26 +124,56 @@ func main() {
 	       os.Exit(1)
        }
 
-       // ...existing code for -target and -keywords...
-       target := *ipAddress
-       // If the target is not an IP, try to resolve it
-       if net.ParseIP(target) == nil {
-	       ips, err := net.LookupIP(target)
+
+       var targets []string
+       if net.ParseIP(*ipAddress) == nil {
+	       ips, err := net.LookupIP(*ipAddress)
 	       if err != nil || len(ips) == 0 {
-		       log.Fatalf("Could not resolve domain %s: %v", target, err)
+		       log.Fatalf("Could not resolve domain %s: %v", *ipAddress, err)
 	       }
-	       target = ips[0].String()
-	       log.Printf("Resolved %s to %s", *ipAddress, target)
+	       for _, ip := range ips {
+		       targets = append(targets, ip.String())
+	       }
+	       log.Printf("Resolved %s to: %v", *ipAddress, targets)
+       } else {
+	       targets = append(targets, *ipAddress)
        }
 
        keywordsParsed := strings.Split(*keywords, ",")
-
-       // get whois information for IP
-       whoisResult, err := whois.Whois(target)
-       if err != nil {
-	       log.Fatal(err)
+       ipChan := make(chan string, len(targets))
+       for _, ip := range targets {
+	       ipChan <- ip
        }
-       //fmt.Println(whoisResult)
+       close(ipChan)
+
+       var allTargetSubnets []string
+       var allTargetAS []string
+       for ip := range ipChan {
+	       whoisResult, err := whois.Whois(ip)
+	       if err != nil {
+		       log.Printf("Whois failed for %s: %v", ip, err)
+		       continue
+	       }
+	       tempCidrs, err := getCIDRsFromString(whoisResult)
+	       if err == nil {
+		       for _, subnet := range tempCidrs {
+			       if !slices.Contains(allTargetSubnets, subnet) {
+				       allTargetSubnets = append(allTargetSubnets, subnet)
+			       }
+		       }
+	       }
+	       targetAS, _ := extractStringsWithRegex(whoisResult, `(AS\\d+)`)
+	       if targetAS != nil {
+		       for _, asn := range targetAS {
+			       if !slices.Contains(allTargetAS, asn) {
+				       allTargetAS = append(allTargetAS, asn)
+			       }
+		       }
+	       }
+	       log.Printf("Whois for %s: CIDRs: %v, ASNs: %v", ip, tempCidrs, targetAS)
+       }
+       log.Println("All Route CIDRs found:      ", allTargetSubnets)
+       log.Println("All AS numbers found:       ", allTargetAS)
 
        var targetSubnets []string
 
