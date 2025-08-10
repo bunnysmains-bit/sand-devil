@@ -87,6 +87,7 @@ func main() {
 	threads := flag.Int("threads", 100, "Number of threads to create")
 	outputFile := flag.String("output", "", "Output file to write results (optional)")
 	urlFlag := flag.String("url", "", "URL to scrape for keywords (optional)")
+	zoneFlag := flag.String("zone", "", "Country code IP Blocks (e.g., 'vn', 'uk', 'es') Can be Zmapped (optional)")
 	flag.Parse()
 
 	r.PreferGo = true
@@ -96,160 +97,160 @@ func main() {
 		}
 		return d.DialContext(ctx, network, fmt.Sprintf("%s:53", *dnsServer))
 	}
+//zone reader saves to output file with the name of it 
+	if *zoneFlag != "" {
+		zoneUrl := fmt.Sprintf("http://www.ipdeny.com/ipblocks/data/countries/%s.zone", strings.ToLower(*zoneFlag))
+		resp, err := http.Get(zoneUrl)
+		if err != nil {
+			fmt.Printf("\033[31m[error]: Failed to fetch zone file: %v\033[0m\n", err)
+			return
+		}
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			fmt.Printf("\033[31m[error]: Failed to read zone file: %v\033[0m\n", err)
+			return
+		}
+		fileName := fmt.Sprintf("%s.zone", strings.ToLower(*zoneFlag))
+		err = os.WriteFile(fileName, body, 0644)
+		if err != nil {
+			fmt.Printf("\033[31m[error]: Failed to save zone file: %v\033[0m\n", err)
+			return
+		}
+		fmt.Printf("\033[32m[success]: Zone file saved as %s\033[0m\n", fileName)
+		return
+	}
 
-       if *urlFlag != "" && *keywords != "" {
-	       // Scrape the URL for keywords
-	       resp, err := http.Get(*urlFlag)
-	       if err != nil {
-		       log.Fatalf("Failed to fetch URL: %v", err)
-	       }
-	       defer resp.Body.Close()
-	       body, err := io.ReadAll(resp.Body)
-	       if err != nil {
-		       log.Fatalf("Failed to read URL body: %v", err)
-	       }
-	       found := false
-	       for _, word := range strings.Split(*keywords, ",") {
-		       if strings.Contains(string(body), word) {
-			       fmt.Printf("Keyword '%s' found in %s\n", word, *urlFlag)
-			       found = true
-		       }
-	       }
-	       if !found {
-		       fmt.Printf("No keywords found in %s\n", *urlFlag)
-	       }
-	       return
-       } else if *ipAddress == "" || *keywords == "" {
-	       flag.Usage()
-	       os.Exit(1)
-       }
+	if *urlFlag != "" && *keywords != "" {
+		// Scrape the URL for keywords
+		resp, err := http.Get(*urlFlag)
+		if err != nil {
+			log.Fatalf("Failed to fetch URL: %v", err)
+		}
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatalf("Failed to read URL body: %v", err)
+		}
+		found := false
+		for _, word := range strings.Split(*keywords, ",") {
+			if strings.Contains(string(body), word) {
+				fmt.Printf("Keyword '%s' found in %s\n", word, *urlFlag)
+				found = true
+			}
+		}
+		if !found {
+			fmt.Printf("No keywords found in %s\n", *urlFlag)
+		}
+		return
+	} else if *ipAddress == "" || *keywords == "" {
+		flag.Usage()
+		os.Exit(1)
+	}
 
+	var targets []string
+	if net.ParseIP(*ipAddress) == nil {
+		ips, err := net.LookupIP(*ipAddress)
+		if err != nil || len(ips) == 0 {
+			log.Fatalf("Could not resolve domain %s: %v", *ipAddress, err)
+		}
+		for _, ip := range ips {
+			targets = append(targets, ip.String())
+		}
+		log.Printf("Resolved %s to: %v", *ipAddress, targets)
+	} else {
+		targets = append(targets, *ipAddress)
+	}
 
-       var targets []string
-       if net.ParseIP(*ipAddress) == nil {
-	       ips, err := net.LookupIP(*ipAddress)
-	       if err != nil || len(ips) == 0 {
-		       log.Fatalf("Could not resolve domain %s: %v", *ipAddress, err)
-	       }
-	       for _, ip := range ips {
-		       targets = append(targets, ip.String())
-	       }
-	       log.Printf("Resolved %s to: %v", *ipAddress, targets)
-       } else {
-	       targets = append(targets, *ipAddress)
-       }
+	keywordsParsed := strings.Split(*keywords, ",")
+	ipChan := make(chan string, len(targets))
+	for _, ip := range targets {
+		ipChan <- ip
+	}
+	close(ipChan)
 
-       keywordsParsed := strings.Split(*keywords, ",")
-       ipChan := make(chan string, len(targets))
-       for _, ip := range targets {
-	       ipChan <- ip
-       }
-       close(ipChan)
+	var allTargetSubnets []string
+	var allTargetAS []string
+	for ip := range ipChan {
+		whoisResult, err := whois.Whois(ip)
+		if err != nil {
+			log.Printf("Whois failed for %s: %v", ip, err)
+			continue
+		}
+		// Extract subnets (CIDRs) from whois result
+		tempCidrs, err := getCIDRsFromString(whoisResult)
+		if err == nil {
+			for _, subnet := range tempCidrs {
+				if !slices.Contains(allTargetSubnets, subnet) {
+					allTargetSubnets = append(allTargetSubnets, subnet)
+				}
+			}
+		}
+		// Extract ASN(s) from whois result
+		targetAS, _ := extractStringsWithRegex(whoisResult, `(AS\\d+)`)
+		for _, asn := range targetAS {
+			if !slices.Contains(allTargetAS, asn) {
+				allTargetAS = append(allTargetAS, asn)
+			}
+		}
+		log.Printf("Whois for %s: CIDRs: %v, ASNs: %v", ip, tempCidrs, targetAS)
+	}
+	log.Println("All Route CIDRs found:      ", allTargetSubnets)
+	log.Println("All AS numbers found:       ", allTargetAS)
 
-       var allTargetSubnets []string
-       var allTargetAS []string
-       for ip := range ipChan {
-	       whoisResult, err := whois.Whois(ip)
-	       if err != nil {
-		       log.Printf("Whois failed for %s: %v", ip, err)
-		       continue
-	       }
-	       // Extract subnets (CIDRs) from whois result
-	       tempCidrs, err := getCIDRsFromString(whoisResult)
-	       if err == nil {
-		       for _, subnet := range tempCidrs {
-			       if !slices.Contains(allTargetSubnets, subnet) {
-				       allTargetSubnets = append(allTargetSubnets, subnet)
-			       }
-		       }
-	       }
-	       // Extract ASN(s) from whois result
-	       targetAS, _ := extractStringsWithRegex(whoisResult, `(AS\\d+)`)
-	       if targetAS != nil {
-		       for _, asn := range targetAS {
-			       if !slices.Contains(allTargetAS, asn) {
-				       allTargetAS = append(allTargetAS, asn)
-			       }
-		       }
-	       }
-	       log.Printf("Whois for %s: CIDRs: %v, ASNs: %v", ip, tempCidrs, targetAS)
-       }
-       log.Println("All Route CIDRs found:      ", allTargetSubnets)
-       log.Println("All AS numbers found:       ", allTargetAS)
+	// Use allTargetSubnets and allTargetAS from above for further processing if needed
+	var ips []string
+	for _, subnet := range allTargetSubnets {
+		ipAddr, err := getIPsFromCIDR(subnet)
+		if err != nil {
+			log.Fatal(err)
+		}
+		ips = append(ips, ipAddr...)
+	}
 
-       var targetSubnets []string
+	log.Println("Number of IPs to scan: ", len(ips))
 
-       // this is an ugly work around because I couldn't get regexes working
-       // to extract IPv6 CIDRs.
-       tempCidrs, err := getCIDRsFromString(whoisResult)
-       if err != nil {
-	       log.Fatal(err)
-       }
-       // this could be a one-liner, but we want to de-duplicate
-       for _, subnet := range tempCidrs {
-	       if !slices.Contains(targetSubnets, subnet) {
-		       targetSubnets = append(targetSubnets, subnet)
-	       }
-       }
+	// ipChan already declared above for initial IP processing, so just reuse for worker pool
+	gather := make(chan result)
+	tracker := make(chan empty)
 
-       targetAS, _ := extractStringsWithRegex(whoisResult, `(AS\d+)`)
-       log.Println("Route CIDR found:      ", targetSubnets)
-       if targetAS != nil {
-	       log.Println("AS number found:       ", targetAS[0])
-       }
+	for i := 0; i < *threads; i++ {
+		go worker(tracker, ipChan, gather, keywordsParsed)
+	}
 
-       var ips []string
-       for _, subnet := range targetSubnets {
-	       ipAddr, err := getIPsFromCIDR(subnet)
-	       if err != nil {
-		       log.Fatal(err)
-	       }
-	       ips = append(ips, ipAddr...)
-       }
+	var output *os.File
+	var errOutput error
+	if *outputFile != "" {
+		output, errOutput = os.Create(*outputFile)
+		if errOutput != nil {
+			log.Fatalf("Failed to open output file: %v", errOutput)
+		}
+		defer output.Close()
+	}
 
-       log.Println("Number of IPs to scan: ", len(ips))
+	go func() {
+		for r := range gather {
+			line := fmt.Sprintf("%-15s => %s\n", r.ip, r.domain)
+			if output != nil {
+				output.WriteString(line)
+			} else {
+				fmt.Print(line)
+			}
+		}
+		var e empty
+		tracker <- e
+	}()
 
-       ipChan := make(chan string)
-       gather := make(chan result)
-       tracker := make(chan empty)
+	for _, v := range ips {
+		ipChan <- v
+	}
 
-       for i := 0; i < *threads; i++ {
-	       go worker(tracker, ipChan, gather, keywordsParsed)
-       }
-
-       var output *os.File
-       var errOutput error
-       if *outputFile != "" {
-	       output, errOutput = os.Create(*outputFile)
-	       if errOutput != nil {
-		       log.Fatalf("Failed to open output file: %v", errOutput)
-	       }
-	       defer output.Close()
-       }
-
-       go func() {
-	       for r := range gather {
-		       line := fmt.Sprintf("%-15s => %s\n", r.ip, r.domain)
-		       if output != nil {
-			       output.WriteString(line)
-		       } else {
-			       fmt.Print(line)
-		       }
-	       }
-	       var e empty
-	       tracker <- e
-       }()
-
-       for _, v := range ips {
-	       ipChan <- v
-       }
-
-       close(ipChan)
-       for i := 0; i < *threads; i++ {
-	       <-tracker
-       }
-       close(gather)
-       <-tracker
+	close(ipChan)
+	for i := 0; i < *threads; i++ {
+		<-tracker
+	}
+	close(gather)
+	<-tracker
 }
 
 func worker(tracker chan empty, ips chan string, gather chan result, keywords []string) {
@@ -325,7 +326,7 @@ func getCIDRsFromString(s string) ([]string, error) {
 	if len(ret) > 0 {
 		return ret, nil
 	}
-	return nil, fmt.Errorf("no CIDR notation subnets found. Sanity check the raw whois output - may be the pattern hasn't been implemented.")
+	return nil, fmt.Errorf("no CIDR notation subnets found; sanity check the raw whois output - may be the pattern hasn't been implemented")
 }
 
 func incrementIP(ip net.IP) {
