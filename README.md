@@ -22,6 +22,10 @@ Usage of sand-devil:
         Target IP address to query for whois information.
   -threads int
         Number of threads to create (default 100)
+   -url int
+        Scrape A specific url for the data and all records
+    -zone int
+        Country code IP Blocks (e.g., 'vn', 'uk', 'es') To Be Zmapped
 ```
 
 #### Examples
@@ -43,6 +47,30 @@ Addresses:  2603:1010:3:3::5b
           20.112.250.133
           20.231.239.246
           20.236.44.162
+```
+
+Say We Are Scraping A Zone Alone And The Data To It
+
+```bash
+$ nslookup microsoft.com
+...SNIP...
+Non-authoritative answer:
+Zone:    vn.zone (vietnam)
+Addresses:  Scrape Of Records
+          8.128.0.0/22
+          8.129.0.0/16
+          8.129.128.0/17
+          8.130.0.0/15
+          8.131.0.0/16
+          8.132.0.0/15
+          8.133.0.0/16
+          8.134.0.0/16
+          8.134.128.0/17
+          8.136.0.0/13
+          8.147.0.0/17
+          8.160.0.0/11
+          39.96.0.0/13
+          39.100.0.0/14
 ```
 
 Then we supply the discovered IP and some keywords to Sand Devil:
