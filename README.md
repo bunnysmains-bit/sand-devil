@@ -5,11 +5,8 @@
       <a href="https://github.com/redskal/sand-devil"><img alt="Logo containing a sea demon" src="assets/logo.png" width="50%" /></a>
 </p>
 
-<p align="center">
-      <a href="https://imgur.com/eMEc0R0" target="_blank">
-            <img src="https://imgur.com/eMEc0R0" alt="Sand Devil Demo Video" width="60%"/>
-      </a>
-</p>
+<blockquote class="imgur-embed-pub" lang="en" data-id="a/vNOhN1d" data-context="false" ><a href="//imgur.com/a/vNOhN1d"></a></blockquote>
+<script async src="//s.imgur.com/min/embed.js" charset="utf-8"></script>
 
 #### Overview
 
