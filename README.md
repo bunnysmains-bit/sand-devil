@@ -6,10 +6,9 @@
 </p>
 
 <p align="center">
-      <video width="50%" controls>
-            <source src="assets/0812.mp4" type="video/mp4">
-            Your browser does not support the video tag.
-      </video>
+      <a href="https://imgur.com/a/vNOhN1d" target="_blank">
+            <img src="https://i.imgur.com/vNOhN1d.gif" alt="Sand Devil Demo Video" width="60%"/>
+      </a>
 </p>
 
 #### Overview
