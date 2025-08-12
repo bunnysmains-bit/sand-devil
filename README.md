@@ -6,7 +6,10 @@
 </p>
 
 <p align="center">
-      <a href="https://github.com/redskal/sand-devil"><img alt="Logo containing a sea demon" src="assets/0812.mp4" width="50%" /></a>
+      <video width="50%" controls>
+            <source src="assets/0812.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+      </video>
 </p>
 
 #### Overview
