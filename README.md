@@ -6,8 +6,8 @@
 </p>
 
 <p align="center">
-      <a href="https://imgur.com/a/vNOhN1d" target="_blank">
-            <img src="https://i.imgur.com/vNOhN1d.gif" alt="Sand Devil Demo Video" width="60%"/>
+      <a href="https://imgur.com/eMEc0R0" target="_blank">
+            <img src="https://imgur.com/eMEc0R0" alt="Sand Devil Demo Video" width="60%"/>
       </a>
 </p>
 
