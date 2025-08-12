@@ -1,6 +1,13 @@
 ## Sand Devil
 
-<p align="center"><a href="https://github.com/redskal/sand-devil"><img alt="Logo containing a sea demon" src="assets/logo.png" width="50%" /></a></p>
+
+<p align="center">
+      <a href="https://github.com/redskal/sand-devil"><img alt="Logo containing a sea demon" src="assets/logo.png" width="50%" /></a>
+</p>
+
+<p align="center">
+      <a href="https://github.com/redskal/sand-devil"><img alt="Logo containing a sea demon" src="assets/0812.mp4" width="50%" /></a>
+</p>
 
 #### Overview
 
@@ -14,69 +21,52 @@ Automates the process of running a whois query against a known IP, identifying t
 
 ```bash
 Usage of sand-devil:
+  -target string
+        Target IP address or domain to query for whois information.
   -keywords string
         Comma-separated list of keywords to search for
   -resolver string
         DNS server to use for lookups (default "1.1.1.1")
-  -target string
-        Target IP address to query for whois information.
   -threads int
         Number of threads to create (default 100)
-   -url int
-        Scrape A specific url for the data and all records
-    -zone int
-        Country code IP Blocks (e.g., 'vn', 'uk', 'es') To Be Zmapped
+  -output string
+        Output file to write results (optional)
+  -url string
+        URL to scrape for keywords (optional)
+  -zone string
+        Country code IP Blocks (e.g., 'vn', 'uk', 'es') Can be Zmapped (optional)
 ```
+
 
 #### Examples
 
-Say we're looking at Microsoft. We need the IP of a known public-facing asset:
+**1. Scrape a zone and save the IP blocks:**
 
 ```bash
-$ nslookup microsoft.com
-...SNIP...
-Non-authoritative answer:
-Name:    microsoft.com
-Addresses:  2603:1010:3:3::5b
-          2603:1030:c02:8::14
-          2603:1030:b:3::152
-          2603:1020:201:10::10f
-          2603:1030:20e:3::23c
-          20.70.246.20
-          20.76.201.171
-          20.112.250.133
-          20.231.239.246
-          20.236.44.162
+$ ./sand-devil -zone vn
+Sand-Devil v0.1.0
+by @sam_phisher
+
+[success]: Zone file saved as vn.zone
 ```
 
-Say We Are Scraping A Zone Alone And The Data To It
+**2. Scrape a URL for keywords:**
 
 ```bash
-$ nslookup microsoft.com
-...SNIP...
-Non-authoritative answer:
-Zone:    vn.zone (vietnam)
-Addresses:  Scrape Of Records
-          8.128.0.0/22
-          8.129.0.0/16
-          8.129.128.0/17
-          8.130.0.0/15
-          8.131.0.0/16
-          8.132.0.0/15
-          8.133.0.0/16
-          8.134.0.0/16
-          8.134.128.0/17
-          8.136.0.0/13
-          8.147.0.0/17
-          8.160.0.0/11
-          39.96.0.0/13
-          39.100.0.0/14
+$ ./sand-devil -url https://example.com -keywords "test,example"
+Sand-Devil v0.1.0
+by @sam_phisher
+
+Keyword 'test' found in https://example.com
 ```
 
-Then we supply the discovered IP and some keywords to Sand Devil:
+**3. Save output to a file:**
 
 ```bash
-$ ./sand-devil -target 20.70.246.20 -keywords "microsoft,office,azure" 
+$ ./sand-devil -target 20.70.246.20 -keywords "microsoft,office,azure" -output results.txt
+Sand-Devil v0.1.0
+by @sam_phisher
+
 2025/01/25 03:38:36 Route CIDR found:       [20.33.0.0/16 20.34.0.0/15 20.36.0.0/14 20.40.0.0/13 20.48.0.0/12 20.64.0.0/10]
 2025/01/25 03:38:37 Number of IPs to scan:  6225920
 20.33.36.48     => ns-mx-megla.westeurope.cloudapp.azure.com.
@@ -87,4 +77,5 @@ $ ./sand-devil -target 20.70.246.20 -keywords "microsoft,office,azure"
 20.33.49.53     => bcmx3.westeurope.cloudapp.azure.com.
 20.33.66.101    => mailout3.westeurope.cloudapp.azure.com.
 ...SNIP...
+[success]: Results saved to results.txt
 ```
